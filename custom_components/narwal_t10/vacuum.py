@@ -56,7 +56,6 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
         | VacuumEntityFeature.RETURN_HOME
         | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.STATE
-        | VacuumEntityFeature.BATTERY
     )
 
     def __init__(self, coordinator: NarwalCoordinator) -> None:
@@ -67,9 +66,6 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
     def activity(self) -> VacuumActivity | None:
         return _activity(self.coordinator.data)
 
-    @property
-    def battery_level(self) -> int | None:
-        return self.coordinator.data.battery if self.coordinator.data else None
 
     @property
     def fan_speed(self) -> str | None:
