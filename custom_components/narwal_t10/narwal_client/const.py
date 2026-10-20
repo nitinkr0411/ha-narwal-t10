@@ -39,20 +39,20 @@ SVC_REBOOT = "/pita/other/reboot"
 # Integer command codes for SVC_COMMAND params: {"cmd": <int>}.
 # Verified live on a Narwal T10 (2026-10-20) by observing robot_status/task_name
 # from a known baseline (the command alone caused the change):
-#   1  -> ExitBase (undock), robot_status 700
+#   1  -> toggle dock/undock, depending on the robot's current location:
+#           docked   -> ExitBase (leave the dock), robot_status 700
+#           off-dock -> Summon -> returns to the dock and charges, robot_status 600
 #   3  -> pause, robot_status 301 (task retained)
 #   4  -> stop/end task, back to idle (robot_status 100, main_task cleared)
 #   5  -> start cleaning (SysStartOperation -> RoomClean), robot_status 300
-# Codes 2 and 6-20 produced no useful effect in the states tested.
-# Return-to-dock / recharge is NOT yet identified: cmd 11 only moves the robot to
-# robot_status 800 (a suspend/hold), it does not drive it home. CMD_DOCK is left
-# unset until a clean isolated test confirms the real code.
+# Codes 2 and 6-30 produced no useful effect in the states tested; cmd 11 only
+# moves the robot to robot_status 800 (a cleaning sub-state), it does not recall.
 CMD_UNDOCK = 1
+CMD_DOCK = 1  # same toggle; when the robot is OFF the dock it returns and charges
 CMD_PAUSE = 3
 CMD_STOP = 4
 CMD_START = 5
 CMD_CONTINUE = 5  # resume uses the start code; distinct resume code not observed
-CMD_DOCK = None  # unconfirmed; return-to-base disabled until identified
 
 # Fan / suction strength values (mode_strength in status). CONFIRM extra levels.
 STRENGTH_LEVELS = {
