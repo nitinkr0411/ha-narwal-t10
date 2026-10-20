@@ -58,6 +58,18 @@ SENSORS: tuple[NarwalSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda s: s.cleaned_area,
     ),
+    NarwalSensorDescription(
+        key="robot_mode",
+        translation_key="robot_mode",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.robot_mode or None,
+    ),
+    NarwalSensorDescription(
+        key="error_code",
+        translation_key="error_code",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda s: s.error_code,
+    ),
 )
 
 

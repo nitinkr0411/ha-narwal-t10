@@ -71,6 +71,24 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
     def fan_speed(self) -> str | None:
         return self.coordinator.data.fan_speed if self.coordinator.data else None
 
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Expose the full decoded robot status for power users and templates."""
+        s = self.coordinator.data
+        if s is None or not s.raw:
+            return None
+        return {
+            "robot_mode": s.robot_mode,
+            "robot_status": s.robot_status,
+            "work_status": s.work_status,
+            "error_code": s.error_code,
+            "charging": s.charging,
+            "on_dock": s.docked,
+            "cleaned_area_m2": s.cleaned_area,
+            "working_progress": s.working_progress,
+            **{k: v for k, v in s.raw.items() if not isinstance(v, (dict, list)) or k == "clean_order"},
+        }
+
     async def async_start(self) -> None:
         await self.coordinator.async_command(cmd.ACTIONS["start"])
 

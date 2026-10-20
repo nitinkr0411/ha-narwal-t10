@@ -42,6 +42,9 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         self.device_id: str = entry.data[CONF_DEVICE_ID]
         self._ws: NarwalWebsocket | None = None
         self.data = RobotStatus()
+        self._map_png: bytes | None = None
+        self.map_updated = None
+        self._map_fetched_at: float = 0.0
 
     async def async_start(self) -> None:
         await self.cloud.ensure_token()
@@ -72,6 +75,29 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
             # Idle robots disconnect from the cloud; keep the last snapshot.
             _LOGGER.debug("status poll failed (robot may be idle): %s", exc)
             return self.data
+
+    async def async_get_map_png(self):
+        """Fetch + render the room map as PNG, cached for ~2 minutes."""
+        import time
+
+        from homeassistant.util import dt as dt_util
+
+        from .narwal_client.mapdata import render_png
+
+        now = time.monotonic()
+        if self._map_png is not None and (now - self._map_fetched_at) < 120:
+            return self._map_png
+        try:
+            result = await self.cloud.get_map(self.device_id)
+            md = result.get("map_data") if isinstance(result, dict) else None
+            if md and md.get("room_layer"):
+                png = await self.hass.async_add_executor_job(render_png, md)
+                self._map_png = png
+                self._map_fetched_at = now
+                self.map_updated = dt_util.utcnow()
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.debug("map fetch/render failed: %s", exc)
+        return self._map_png
 
     async def async_command(self, verb: str) -> None:
         if self._ws is None or not self._ws.connected:

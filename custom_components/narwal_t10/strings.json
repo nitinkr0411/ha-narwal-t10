@@ -4,32 +4,26 @@
       "user": {
         "title": "Narwal T10",
         "description": "Sign in with your Narwal app account.",
-        "data": {
-          "email": "Email",
-          "password": "Password",
-          "region": "Region"
-        }
+        "data": { "email": "Email", "password": "Password", "region": "Region" }
       },
-      "device": {
-        "title": "Choose your robot",
-        "data": {
-          "device_id": "Robot"
-        }
-      }
+      "device": { "title": "Choose your robot", "data": { "device_id": "Robot" } }
     },
     "error": {
       "invalid_auth": "Invalid email or password.",
       "cannot_connect": "Could not reach the Narwal cloud.",
       "no_robots": "No robots are bound to this account."
     },
-    "abort": {
-      "already_configured": "This robot is already set up."
-    }
+    "abort": { "already_configured": "This robot is already set up." }
   },
   "entity": {
     "sensor": {
       "status": { "name": "Status" },
-      "cleaned_area": { "name": "Cleaned area" }
+      "cleaned_area": { "name": "Cleaned area" },
+      "robot_mode": { "name": "Robot mode" },
+      "error_code": { "name": "Error code" }
+    },
+    "binary_sensor": {
+      "docked": { "name": "Docked" }
     }
   }
 }

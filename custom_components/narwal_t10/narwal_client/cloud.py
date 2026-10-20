@@ -161,6 +161,13 @@ class NarwalCloud:
         result = body.get("result", body)
         return result if isinstance(result, dict) else {}
 
+    async def get_map(self, robot_id: str) -> dict[str, Any]:
+        """Return the map result (``map_data``, ``room_attr``, ...) from /robot/pita/map."""
+        await self.ensure_token()
+        body = await self._request("GET", f"/robot/pita/map?robot_id={robot_id}")
+        result = body.get("result", body)
+        return result if isinstance(result, dict) else {}
+
 
 async def _as_json(resp: aiohttp.ClientResponse, text: str) -> dict[str, Any]:
     import json
