@@ -66,5 +66,6 @@ STRENGTH_TO_FAN = {v: k for k, v in STRENGTH_LEVELS.items()}
 # WebSocket timing
 KEEPALIVE_INTERVAL = 20.0
 RECONNECT_BACKOFF_MAX = 60.0
-STATUS_POLL_FALLBACK = 30.0
+STATUS_POLL_FALLBACK = 30.0  # seconds between polls while docked/idle
+ACTIVE_POLL = 4.0  # seconds between polls while the robot is working
 REQUEST_TIMEOUT = 10.0

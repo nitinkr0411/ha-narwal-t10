@@ -20,7 +20,7 @@ from .ha_const import (
     DOMAIN,
 )
 from .narwal_client import NarwalCloud, NarwalCloudError, NarwalWebsocket, RobotStatus
-from .narwal_client.const import STATUS_POLL_FALLBACK
+from .narwal_client.const import ACTIVE_POLL, STATUS_POLL_FALLBACK
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +63,17 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
     def _on_status(self, result: dict[str, Any]) -> None:
         self.async_set_updated_data(RobotStatus.from_result(result))
 
+    def _retune_interval(self, status: RobotStatus) -> None:
+        """Poll fast while the robot is working, slowly while it is docked/idle."""
+        active = bool(status) and (
+            (status.docked is False)
+            or bool(status.work_status)
+            or (status.robot_status not in (None, 100, 301))
+        )
+        wanted = timedelta(seconds=ACTIVE_POLL if active else STATUS_POLL_FALLBACK)
+        if self.update_interval != wanted:
+            self.update_interval = wanted
+
     async def _async_update_data(self) -> RobotStatus:
         """Polling fallback: request a status snapshot; keep last known on failure."""
         try:
@@ -73,12 +84,16 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
                 # Prime the room list once so entities can expose rooms without
                 # waiting for the map image to be rendered.
                 await self.async_get_map_png()
-            return RobotStatus.from_result(result)
+            status = RobotStatus.from_result(result)
+            self._retune_interval(status)
+            return status
         except NarwalCloudError as exc:
             raise UpdateFailed(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
-            # Idle robots disconnect from the cloud; keep the last snapshot.
+            # Idle robots disconnect from the cloud; keep the last snapshot and
+            # slow the polling back down.
             _LOGGER.debug("status poll failed (robot may be idle): %s", exc)
+            self.update_interval = timedelta(seconds=STATUS_POLL_FALLBACK)
             return self.data
 
     async def async_get_map_png(self):
@@ -106,17 +121,25 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
             _LOGGER.debug("map fetch/render failed: %s", exc)
         return self._map_png
 
+    async def _refresh_soon(self) -> None:
+        # Pick up the new state quickly and let the poll interval re-tune to fast.
+        self.update_interval = timedelta(seconds=ACTIVE_POLL)
+        await self.async_request_refresh()
+
     async def async_command(self, code: int) -> None:
         if self._ws is None or not self._ws.connected:
             await self.async_start()
         await self._ws.send_command(code)  # type: ignore[union-attr]
+        await self._refresh_soon()
 
     async def async_set_fan(self, level: str) -> None:
         if self._ws is None or not self._ws.connected:
             await self.async_start()
         await self._ws.set_fan_speed(level)  # type: ignore[union-attr]
+        await self._refresh_soon()
 
     async def async_clean_rooms(self, room_ids: list[int]) -> None:
         if self._ws is None or not self._ws.connected:
             await self.async_start()
         await self._ws.clean_rooms(room_ids)  # type: ignore[union-attr]
+        await self._refresh_soon()
