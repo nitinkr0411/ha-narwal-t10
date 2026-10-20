@@ -106,8 +106,20 @@ class NarwalWebsocket:
 
     async def send_command(self, code: int) -> None:
         # Verified live: the command service takes {"cmd": <int>}. Codes are in
-        # const.py (CMD_START=5, CMD_PAUSE=3, CMD_STOP=4, CMD_DOCK=11, ...).
+        # const.py (CMD_START=5, CMD_PAUSE=3, CMD_STOP=4, dock/undock toggle=1).
         await self.send(SVC_COMMAND, {"cmd": code})
+
+    async def clean_rooms(self, room_ids: list[int]) -> None:
+        """Start a clean restricted to the given room ids.
+
+        Captured from the app: a room clean is the start command plus a
+        ``clean_order`` list and an (empty) ``floor_type``; omitting ``floor_type``
+        makes the robot ignore ``clean_order`` and clean everything.
+        """
+        from .const import CMD_START
+
+        ids = [int(r) for r in room_ids]
+        await self.send(SVC_COMMAND, {"cmd": CMD_START, "clean_order": ids, "floor_type": []})
 
     async def set_fan_speed(self, level_name: str) -> None:
         strength = STRENGTH_LEVELS.get(level_name)

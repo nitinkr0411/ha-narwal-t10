@@ -25,6 +25,28 @@ _LOGGER = logging.getLogger(__name__)
 _FAN_LIST = list(STRENGTH_LEVELS)  # quiet/normal/strong/max
 
 
+def _coerce_room_ids(params) -> list[int]:
+    """Pull a list of room ids out of the many shapes send_command params take."""
+    if params is None:
+        return []
+    if isinstance(params, dict):
+        for key in ("rooms", "room_ids", "segments", "clean_order"):
+            if key in params:
+                params = params[key]
+                break
+        else:
+            return []
+    if isinstance(params, (int, str)):
+        params = [params]
+    out: list[int] = []
+    for p in params or []:
+        try:
+            out.append(int(p))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _activity(s: RobotStatus) -> VacuumActivity | None:
     if s is None:
         return None
@@ -56,6 +78,7 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
         | VacuumEntityFeature.RETURN_HOME
         | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.STATE
+        | VacuumEntityFeature.SEND_COMMAND
     )
 
     def __init__(self, coordinator: NarwalCoordinator) -> None:
@@ -115,3 +138,17 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
 
     async def async_set_fan_speed(self, fan_speed: str, **kwargs) -> None:
         await self.coordinator.async_set_fan(fan_speed)
+
+    async def async_send_command(self, command: str, params=None, **kwargs) -> None:
+        """Support per-room cleaning via ``vacuum.send_command``.
+
+        Example: ``command: clean_room`` with ``params: {"rooms": [0, 2]}`` (or a
+        bare list ``params: [0, 2]``) cleans only those room ids. Room ids come
+        from the vacuum's ``rooms`` attribute.
+        """
+        if command not in ("clean_room", "clean_rooms", "clean_segment", "clean_segments"):
+            raise ValueError(f"unsupported command: {command}")
+        ids = _coerce_room_ids(params)
+        if not ids:
+            raise ValueError("no room ids given; pass params like {'rooms': [0, 2]}")
+        await self.coordinator.async_clean_rooms(ids)

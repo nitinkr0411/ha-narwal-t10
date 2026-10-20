@@ -115,3 +115,8 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         if self._ws is None or not self._ws.connected:
             await self.async_start()
         await self._ws.set_fan_speed(level)  # type: ignore[union-attr]
+
+    async def async_clean_rooms(self, room_ids: list[int]) -> None:
+        if self._ws is None or not self._ws.connected:
+            await self.async_start()
+        await self._ws.clean_rooms(room_ids)  # type: ignore[union-attr]

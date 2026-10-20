@@ -44,8 +44,9 @@ def _looks_numeric(s: Any) -> bool:
 def parse_rooms(map_result: dict[str, Any]) -> list[dict[str, Any]]:
     """Return cleanable rooms as ``[{"room_id", "type", "name"}]`` from a map result.
 
-    A room keeps its user-given name when set; otherwise it is labelled by type.
-    Forbidden/virtual areas (type >= 254) are dropped.
+    Every room the robot segments is cleanable (its ``room_id`` is the value used
+    in a clean command's ``clean_order``). A room keeps its user-given name when
+    set, is labelled by type when the type is known, and otherwise is "Room <id>".
     """
     ra = (map_result or {}).get("room_attr") or {}
     attrs = ra.get("attr") if isinstance(ra, dict) else None
@@ -56,14 +57,15 @@ def parse_rooms(map_result: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(a, dict):
             continue
         rid = a.get("room_id")
-        typ = a.get("type")
-        if rid is None or (isinstance(typ, int) and (typ in _NON_ROOM_TYPES or typ >= 90)):
+        if not isinstance(rid, int):
             continue
+        typ = a.get("type")
         name = a.get("name")
         label = name if (isinstance(name, str) and name.strip() and not _looks_numeric(name)) else None
         if not label:
-            label = ROOM_TYPE_NAMES.get(typ, f"Room {rid}")
+            label = ROOM_TYPE_NAMES.get(typ) or f"Room {rid}"
         rooms.append({"room_id": rid, "type": typ, "name": label})
+    rooms.sort(key=lambda r: r["room_id"])
     return rooms
 
 

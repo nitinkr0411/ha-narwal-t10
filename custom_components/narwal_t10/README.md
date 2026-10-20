@@ -58,6 +58,25 @@ python -m narwal_client.cli --region us fan strong  # set fan speed
 python -m narwal_client.cli --region us raw /pita/info/all   # any service
 ```
 
+## Rooms and per-room cleaning
+
+The map image is labelled per room and `vacuum.djroomba` exposes a `rooms`
+attribute listing each room's `room_id` and `name`. To clean one or more specific
+rooms, call `vacuum.send_command` with the room ids:
+
+```yaml
+service: vacuum.send_command
+target:
+  entity_id: vacuum.djroomba
+data:
+  command: clean_room
+  params:
+    rooms: [0, 2]   # room_id values from the vacuum's "rooms" attribute
+```
+
+A bare list (`params: [0, 2]`) also works. The robot starts a clean restricted to
+those rooms; `vacuum.return_to_base` (or the card's dock button) sends it home.
+
 ## Tests
 
 ```bash
