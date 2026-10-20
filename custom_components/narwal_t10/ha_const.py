@@ -11,7 +11,7 @@ CONF_DEVICE_ID = "device_id"  # robot_id
 CONF_MACHINE_ID = "machine_id"
 CONF_DEVICE_NAME = "device_name"
 
-PLATFORMS = ["vacuum", "sensor", "binary_sensor", "image"]
+PLATFORMS = ["vacuum", "sensor", "binary_sensor", "image", "button"]
 
 MANUFACTURER = "Narwal"
 MODEL = "T10"
