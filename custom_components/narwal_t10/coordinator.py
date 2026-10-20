@@ -46,12 +46,16 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         self.map_updated = None
         self._map_fetched_at: float = 0.0
         self.rooms: list[dict[str, Any]] = []
+        self._base_map_data: dict[str, Any] | None = None
+        self._base_map_at: float = 0.0
+        self.robot_pose: dict[str, Any] | None = None
+        self._last_pose_push: float = 0.0
 
     async def async_start(self) -> None:
         await self.cloud.ensure_token()
         self._ws = NarwalWebsocket(
             self._http, self.cloud.ws_base, self.machine_id,
-            self.cloud.session.token, on_status=self._on_status,
+            self.cloud.session.token, on_status=self._on_status, on_map=self._on_map,
         )
         await self._ws.connect()
 
@@ -61,7 +65,28 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
             self._ws = None
 
     def _on_status(self, result: dict[str, Any]) -> None:
-        self.async_set_updated_data(RobotStatus.from_result(result))
+        status = RobotStatus.from_result(result)
+        if status.docked:
+            self.robot_pose = None  # hide the live marker once home
+        self.async_set_updated_data(status)
+
+    def _on_map(self, result: dict[str, Any]) -> None:
+        """Live robot pose pushed over /pita/map while cleaning."""
+        import time
+
+        from homeassistant.util import dt as dt_util
+
+        x, y = result.get("x"), result.get("y")
+        if x is None or y is None:
+            return
+        self.robot_pose = {"x": x, "y": y, "theta": result.get("theta")}
+        # Throttle map re-renders; pushes arrive a few times per second.
+        now = time.monotonic()
+        if now - self._last_pose_push < 1.5:
+            return
+        self._last_pose_push = now
+        self.map_updated = dt_util.utcnow()
+        self.async_update_listeners()
 
     def _retune_interval(self, status: RobotStatus) -> None:
         """Poll fast while the robot is working, slowly while it is docked/idle."""
@@ -105,20 +130,29 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         from .narwal_client.mapdata import parse_rooms, render_png
 
         now = time.monotonic()
-        if self._map_png is not None and (now - self._map_fetched_at) < 120:
+        # Refresh the static base map (rooms/walls) occasionally; it only changes
+        # when the robot remaps. The live robot marker is overlaid on every render.
+        if self._base_map_data is None or (now - self._base_map_at) > 120:
+            try:
+                result = await self.cloud.get_map(self.device_id)
+                md = result.get("map_data") if isinstance(result, dict) else None
+                if isinstance(result, dict):
+                    self.rooms = parse_rooms(result)
+                if md and md.get("room_layer"):
+                    self._base_map_data = md
+                    self._base_map_at = now
+                    if self.map_updated is None:
+                        self.map_updated = dt_util.utcnow()
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.debug("map fetch failed: %s", exc)
+        if not self._base_map_data:
             return self._map_png
         try:
-            result = await self.cloud.get_map(self.device_id)
-            md = result.get("map_data") if isinstance(result, dict) else None
-            if isinstance(result, dict):
-                self.rooms = parse_rooms(result)
-            if md and md.get("room_layer"):
-                png = await self.hass.async_add_executor_job(render_png, md, 4, self.rooms)
-                self._map_png = png
-                self._map_fetched_at = now
-                self.map_updated = dt_util.utcnow()
+            self._map_png = await self.hass.async_add_executor_job(
+                render_png, self._base_map_data, 4, self.rooms, self.robot_pose
+            )
         except Exception as exc:  # noqa: BLE001
-            _LOGGER.debug("map fetch/render failed: %s", exc)
+            _LOGGER.debug("map render failed: %s", exc)
         return self._map_png
 
     async def _refresh_soon(self) -> None:

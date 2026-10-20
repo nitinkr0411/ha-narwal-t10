@@ -89,12 +89,18 @@ def _room_id_of(v: int) -> int | None:
 
 
 def render_png(
-    map_data: dict[str, Any], scale: int = 4, rooms: list[dict[str, Any]] | None = None
+    map_data: dict[str, Any],
+    scale: int = 4,
+    rooms: list[dict[str, Any]] | None = None,
+    robot_pose: dict[str, Any] | None = None,
 ) -> bytes:
-    """Render the map to PNG bytes, labelling rooms when ``rooms`` is given.
+    """Render the map to PNG bytes, labelling rooms when ``rooms`` is given and
+    drawing a live robot marker when ``robot_pose`` ({x, y, theta}) is given.
 
     Requires Pillow (bundled with Home Assistant).
     """
+    import math
+
     from PIL import Image, ImageDraw, ImageFont
 
     w, h, layer = decode_layer(map_data)
@@ -147,6 +153,22 @@ def render_png(
             d.ellipse([dx - 9, dy - 9, dx + 9, dy + 9], fill=(255, 255, 255), outline=(0, 0, 0), width=2)
     except (KeyError, TypeError, ValueError):
         pass
+
+    # Live robot marker (position + heading) from the pushed /pita/map pose.
+    if robot_pose and robot_pose.get("x") is not None:
+        try:
+            res = float(map_data["resolution"])
+            ox = float(map_data["origin_x"])
+            oy = float(map_data["origin_y"])
+            rx = (float(robot_pose["x"]) - ox) / res * scale
+            ry = (float(robot_pose["y"]) - oy) / res * scale
+            th = float(robot_pose.get("theta") or 0.0)
+            hx = rx + math.cos(th) * 16
+            hy = ry + math.sin(th) * 16
+            d.line([rx, ry, hx, hy], fill=(220, 20, 60), width=4)
+            d.ellipse([rx - 10, ry - 10, rx + 10, ry + 10], fill=(220, 20, 60), outline=(255, 255, 255), width=3)
+        except (KeyError, TypeError, ValueError):
+            pass
 
     import io
 

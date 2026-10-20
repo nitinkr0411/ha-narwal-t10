@@ -39,12 +39,14 @@ class NarwalWebsocket:
         token: str,
         *,
         on_status: StatusCallback | None = None,
+        on_map: StatusCallback | None = None,
     ) -> None:
         self._http = session
         self._url = ws_url
         self._machine_id = machine_id
         self._token = token
         self._on_status = on_status
+        self._on_map = on_map
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._recv_task: asyncio.Task | None = None
         self._pending: dict[str, asyncio.Future] = {}
@@ -144,9 +146,16 @@ class NarwalWebsocket:
                 fut = self._pending.get(rid) if rid else None
                 if fut is not None and not fut.done():
                     fut.set_result(obj)
-                # Any message carrying a status result updates the coordinator.
+                # Route pushes: /pita/map carries the live robot pose + path;
+                # any frame with battery_per is a status snapshot.
                 result = obj.get("result")
-                if isinstance(result, dict) and "battery_per" in result and self._on_status:
+                if not isinstance(result, dict):
+                    continue
+                if obj.get("service") == "/pita/map" and self._on_map:
+                    res = self._on_map(result)
+                    if asyncio.iscoroutine(res):
+                        await res
+                elif "battery_per" in result and self._on_status:
                     res = self._on_status(result)
                     if asyncio.iscoroutine(res):
                         await res
