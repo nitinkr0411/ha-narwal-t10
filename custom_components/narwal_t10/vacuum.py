@@ -77,7 +77,7 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
         s = self.coordinator.data
         if s is None or not s.raw:
             return None
-        return {
+        attrs = {
             "robot_mode": s.robot_mode,
             "robot_status": s.robot_status,
             "work_status": s.work_status,
@@ -88,6 +88,13 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
             "working_progress": s.working_progress,
             **{k: v for k, v in s.raw.items() if not isinstance(v, (dict, list)) or k == "clean_order"},
         }
+        # Rooms detected on the saved map (id + label). Per-room cleaning is not
+        # exposed yet because the robot's room-clean command is not confirmed.
+        if self.coordinator.rooms:
+            attrs["rooms"] = [
+                {"room_id": r["room_id"], "name": r["name"]} for r in self.coordinator.rooms
+            ]
+        return attrs
 
     async def async_start(self) -> None:
         await self.coordinator.async_command(cmd.ACTIONS["start"])

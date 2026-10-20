@@ -45,6 +45,7 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         self._map_png: bytes | None = None
         self.map_updated = None
         self._map_fetched_at: float = 0.0
+        self.rooms: list[dict[str, Any]] = []
 
     async def async_start(self) -> None:
         await self.cloud.ensure_token()
@@ -68,6 +69,10 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
             if self._ws is None or not self._ws.connected:
                 await self.async_start()
             result = await self._ws.get_status()  # type: ignore[union-attr]
+            if not self.rooms:
+                # Prime the room list once so entities can expose rooms without
+                # waiting for the map image to be rendered.
+                await self.async_get_map_png()
             return RobotStatus.from_result(result)
         except NarwalCloudError as exc:
             raise UpdateFailed(str(exc)) from exc
@@ -82,7 +87,7 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
 
         from homeassistant.util import dt as dt_util
 
-        from .narwal_client.mapdata import render_png
+        from .narwal_client.mapdata import parse_rooms, render_png
 
         now = time.monotonic()
         if self._map_png is not None and (now - self._map_fetched_at) < 120:
@@ -90,8 +95,10 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         try:
             result = await self.cloud.get_map(self.device_id)
             md = result.get("map_data") if isinstance(result, dict) else None
+            if isinstance(result, dict):
+                self.rooms = parse_rooms(result)
             if md and md.get("room_layer"):
-                png = await self.hass.async_add_executor_job(render_png, md)
+                png = await self.hass.async_add_executor_job(render_png, md, 4, self.rooms)
                 self._map_png = png
                 self._map_fetched_at = now
                 self.map_updated = dt_util.utcnow()
