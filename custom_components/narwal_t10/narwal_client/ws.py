@@ -104,10 +104,10 @@ class NarwalWebsocket:
         assert self._ws is not None
         await self._ws.send_str(encode_frame(build_request(self._machine_id, service, params)))
 
-    async def send_command(self, verb: str) -> None:
-        # CONFIRM: the "type" param and verb values are inferred from app strings;
-        # the status path is verified, the command param shape is not yet captured.
-        await self.send(SVC_COMMAND, {"type": verb})
+    async def send_command(self, code: int) -> None:
+        # Verified live: the command service takes {"cmd": <int>}. Codes are in
+        # const.py (CMD_START=5, CMD_PAUSE=3, CMD_STOP=4, CMD_DOCK=11, ...).
+        await self.send(SVC_COMMAND, {"cmd": code})
 
     async def set_fan_speed(self, level_name: str) -> None:
         strength = STRENGTH_LEVELS.get(level_name)

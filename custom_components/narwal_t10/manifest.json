@@ -1,9 +1,9 @@
 {
   "domain": "narwal_t10",
   "name": "Narwal T10 (cloud)",
-  "version": "0.3.0",
-  "documentation": "https://github.com/nitinkr0411/ha-narwal-t10",
-  "issue_tracker": "https://github.com/nitinkr0411/ha-narwal-t10/issues",
+  "version": "0.4.0",
+  "documentation": "https://github.com/local/narwal_t10",
+  "issue_tracker": "https://github.com/local/narwal_t10/issues",
   "config_flow": true,
   "iot_class": "cloud_push",
   "integration_type": "device",
@@ -12,7 +12,5 @@
     "Pillow>=10.0.0"
   ],
   "dependencies": [],
-  "codeowners": [
-    "@nitinkr0411"
-  ]
+  "codeowners": []
 }

@@ -36,13 +36,23 @@ SVC_SET_SWEEP_STRENGTH = "/pita/config/set_sweep_strength"  # fan/suction
 SVC_SET_VOLUME = "/pita/info/volume/set"
 SVC_REBOOT = "/pita/other/reboot"
 
-# Command verbs for SVC_COMMAND params. CONFIRM against a live (active) robot;
-# derived from app string constants (Stop_Clean, Back_Wash, Task_*).
-CMD_START = "Start_Clean"
-CMD_PAUSE = "Pause_Clean"
-CMD_CONTINUE = "Continue_Clean"
-CMD_STOP = "Stop_Clean"
-CMD_DOCK = "Back_Wash"  # return to dock / washstation
+# Integer command codes for SVC_COMMAND params: {"cmd": <int>}.
+# Verified live on a Narwal T10 (2026-10-20) by observing robot_status/task_name
+# from a known baseline (the command alone caused the change):
+#   1  -> ExitBase (undock), robot_status 700
+#   3  -> pause, robot_status 301 (task retained)
+#   4  -> stop/end task, back to idle (robot_status 100, main_task cleared)
+#   5  -> start cleaning (SysStartOperation -> RoomClean), robot_status 300
+# Codes 2 and 6-20 produced no useful effect in the states tested.
+# Return-to-dock / recharge is NOT yet identified: cmd 11 only moves the robot to
+# robot_status 800 (a suspend/hold), it does not drive it home. CMD_DOCK is left
+# unset until a clean isolated test confirms the real code.
+CMD_UNDOCK = 1
+CMD_PAUSE = 3
+CMD_STOP = 4
+CMD_START = 5
+CMD_CONTINUE = 5  # resume uses the start code; distinct resume code not observed
+CMD_DOCK = None  # unconfirmed; return-to-base disabled until identified
 
 # Fan / suction strength values (mode_strength in status). CONFIRM extra levels.
 STRENGTH_LEVELS = {

@@ -99,10 +99,10 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
             _LOGGER.debug("map fetch/render failed: %s", exc)
         return self._map_png
 
-    async def async_command(self, verb: str) -> None:
+    async def async_command(self, code: int) -> None:
         if self._ws is None or not self._ws.connected:
             await self.async_start()
-        await self._ws.send_command(verb)  # type: ignore[union-attr]
+        await self._ws.send_command(code)  # type: ignore[union-attr]
 
     async def async_set_fan(self, level: str) -> None:
         if self._ws is None or not self._ws.connected:

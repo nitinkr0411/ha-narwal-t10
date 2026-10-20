@@ -49,11 +49,12 @@ async def async_setup_entry(
 class NarwalVacuum(NarwalEntity, StateVacuumEntity):
     _attr_name = None
     _attr_fan_speed_list = _FAN_LIST
+    # RETURN_HOME is intentionally omitted: the recharge/dock command code is not
+    # yet confirmed (cmd 11 only suspends). Re-add once identified.
     _attr_supported_features = (
         VacuumEntityFeature.START
         | VacuumEntityFeature.PAUSE
         | VacuumEntityFeature.STOP
-        | VacuumEntityFeature.RETURN_HOME
         | VacuumEntityFeature.FAN_SPEED
         | VacuumEntityFeature.STATE
     )
@@ -97,9 +98,6 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
 
     async def async_stop(self, **kwargs) -> None:
         await self.coordinator.async_command(cmd.ACTIONS["stop"])
-
-    async def async_return_to_base(self, **kwargs) -> None:
-        await self.coordinator.async_command(cmd.ACTIONS["dock"])
 
     async def async_set_fan_speed(self, fan_speed: str, **kwargs) -> None:
         await self.coordinator.async_set_fan(fan_speed)
