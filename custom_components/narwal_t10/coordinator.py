@@ -50,8 +50,23 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
         self._base_map_at: float = 0.0
         self.robot_pose: dict[str, Any] | None = None
         self._last_pose_push: float = 0.0
+        # Diagnostics: how many /pita/map frames the socket has delivered, and
+        # when the last one carried a usable pose. Surfaced as vacuum attributes
+        # so the live-map data path can be observed from the HA frontend.
+        self.map_push_count: int = 0
+        self.last_map_push: str | None = None
 
     async def async_start(self) -> None:
+        # Tear down any prior socket first: the cloud allows one WS per
+        # credential and the live /pita/map pushes bind to a single session, so
+        # two overlapping connections kick each other off (self-contention) and
+        # the live-map marker stops updating. Always leave exactly one open.
+        if self._ws is not None:
+            try:
+                await self._ws.disconnect()
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.debug("stale WS teardown failed: %s", exc)
+            self._ws = None
         await self.cloud.ensure_token()
         self._ws = NarwalWebsocket(
             self._http, self.cloud.ws_base, self.machine_id,
@@ -76,9 +91,11 @@ class NarwalCoordinator(DataUpdateCoordinator[RobotStatus]):
 
         from homeassistant.util import dt as dt_util
 
+        self.map_push_count += 1
         x, y = result.get("x"), result.get("y")
         if x is None or y is None:
             return
+        self.last_map_push = dt_util.utcnow().isoformat()
         self.robot_pose = {"x": x, "y": y, "theta": result.get("theta")}
         # Throttle map re-renders; pushes arrive a few times per second.
         now = time.monotonic()

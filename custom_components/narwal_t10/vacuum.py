@@ -117,6 +117,10 @@ class NarwalVacuum(NarwalEntity, StateVacuumEntity):
             attrs["rooms"] = [
                 {"room_id": r["room_id"], "name": r["name"]} for r in self.coordinator.rooms
             ]
+        # Live-map data-path diagnostics (see coordinator).
+        attrs["map_push_count"] = self.coordinator.map_push_count
+        attrs["last_map_push"] = self.coordinator.last_map_push
+        attrs["has_live_pose"] = self.coordinator.robot_pose is not None
         return attrs
 
     async def async_start(self) -> None:
