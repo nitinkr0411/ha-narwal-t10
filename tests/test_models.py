@@ -61,16 +61,18 @@ def test_parse_rooms_and_layer_bits():
     assert _room_id_of(64) == 6
     assert _room_id_of(66) is None  # 64|2 boundary
     assert _room_id_of(0) is None
+    # Names mirror the app: type -> label, custom non-numeric name honoured,
+    # unknown type -> "Room", and repeated labels numbered per occurrence.
     m = {"room_attr": {"attr": [
-        {"room_id": 0, "type": 4, "name": "4"},
-        {"room_id": 1, "type": 1, "name": "1"},
-        {"room_id": 2, "type": 3, "name": "My Den"},
-        {"room_id": 5, "type": 254, "name": "-2"},  # forbidden/virtual -> dropped
+        {"room_id": 0, "type": 4, "name": "4"},    # Bathroom (1st)
+        {"room_id": 1, "type": 1, "name": "1"},    # guest room
+        {"room_id": 2, "type": 3, "name": "My Den"},  # custom name kept
+        {"room_id": 3, "type": 4, "name": "4"},    # Bathroom (2nd) -> numbered
+        {"room_id": 5, "type": 254, "name": "-2"}, # unknown -> generic Room
     ]}}
     rooms = parse_rooms(m)
-    # All segmented rooms are cleanable; unknown type -> "Room <id>", custom name kept.
     assert {r["room_id"]: r["name"] for r in rooms} == {
-        0: "Kitchen", 1: "Master Bedroom", 2: "My Den", 5: "Room 5",
+        0: "Bathroom1", 1: "guest room", 2: "My Den", 3: "Bathroom2", 5: "Room",
     }
 
 

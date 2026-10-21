@@ -20,17 +20,19 @@ ROOM_COLORS = [
 ]
 WALL = (0x37, 0x41, 0x51)
 
-# Narwal room-type code -> label (the app labels rooms by type unless the user
-# renamed them). Verified against the T10 (types 1/3/4 = Master Bedroom/Living
-# Room/Kitchen on the test map); higher values match the app's room-name keys.
+# Narwal room-type code -> base label. The app does NOT store custom room names
+# in the cloud; it GENERATES each name from the room's type code, and when a base
+# label repeats it numbers the occurrences in room_id order (e.g. two type-4
+# rooms become "Bathroom1" and "Bathroom2"). This table and the numbering in
+# parse_rooms were swept directly from the T10 app by injecting each type code
+# and reading the rendered label, so HA matches the app exactly. Any type not
+# listed (8+, and the forbidden/virtual 254/255) renders as the generic
+# ``ROOM_FALLBACK`` ("Room"), also numbered when it repeats.
 ROOM_TYPE_NAMES: dict[int, str] = {
-    0: "Room", 1: "Master Bedroom", 2: "Second Bedroom", 3: "Living Room",
-    4: "Kitchen", 5: "Bathroom", 6: "Toilet", 7: "Dining Room", 8: "Dining Room",
-    9: "Balcony", 10: "Utility Room", 11: "Study", 12: "Nursery",
-    13: "Recreation Room", 14: "Storage Room", 15: "Other",
+    0: "Master Bedroom", 1: "guest room", 2: "Living Room", 3: "Kitchen",
+    4: "Bathroom", 5: "Balcony", 6: "Den", 7: "Other",
 }
-# Room ids with these type codes are not cleanable rooms (forbidden/virtual areas).
-_NON_ROOM_TYPES = {254, 255}
+ROOM_FALLBACK = "Room"
 
 
 def _looks_numeric(s: Any) -> bool:
@@ -45,27 +47,41 @@ def parse_rooms(map_result: dict[str, Any]) -> list[dict[str, Any]]:
     """Return cleanable rooms as ``[{"room_id", "type", "name"}]`` from a map result.
 
     Every room the robot segments is cleanable (its ``room_id`` is the value used
-    in a clean command's ``clean_order``). A room keeps its user-given name when
-    set, is labelled by type when the type is known, and otherwise is "Room <id>".
+    in a clean command's ``clean_order``). Names mirror the Narwal app exactly:
+    each room's base label comes from its type code (``ROOM_TYPE_NAMES``, else
+    ``ROOM_FALLBACK``), and a base label shared by more than one room is numbered
+    per occurrence in room_id order (``Bathroom1``/``Bathroom2``). A genuinely
+    custom ``room_attr`` name (a non-numeric string) is honoured if the cloud ever
+    provides one, but the T10 only ever sends the type code there.
     """
     ra = (map_result or {}).get("room_attr") or {}
     attrs = ra.get("attr") if isinstance(ra, dict) else None
     if not isinstance(attrs, list):
         return []
-    rooms: list[dict[str, Any]] = []
+    raw: list[tuple[int, Any, str | None]] = []
     for a in attrs:
         if not isinstance(a, dict):
             continue
         rid = a.get("room_id")
         if not isinstance(rid, int):
             continue
-        typ = a.get("type")
         name = a.get("name")
-        label = name if (isinstance(name, str) and name.strip() and not _looks_numeric(name)) else None
-        if not label:
-            label = ROOM_TYPE_NAMES.get(typ) or f"Room {rid}"
+        custom = name if (isinstance(name, str) and name.strip() and not _looks_numeric(name)) else None
+        raw.append((rid, a.get("type"), custom))
+    raw.sort(key=lambda r: r[0])
+    bases = [custom or ROOM_TYPE_NAMES.get(typ, ROOM_FALLBACK) for (_, typ, custom) in raw]
+    counts: dict[str, int] = {}
+    for b in bases:
+        counts[b] = counts.get(b, 0) + 1
+    seen: dict[str, int] = {}
+    rooms: list[dict[str, Any]] = []
+    for (rid, typ, _), base in zip(raw, bases):
+        if counts[base] > 1:
+            seen[base] = seen.get(base, 0) + 1
+            label = f"{base}{seen[base]}"
+        else:
+            label = base
         rooms.append({"room_id": rid, "type": typ, "name": label})
-    rooms.sort(key=lambda r: r["room_id"])
     return rooms
 
 
