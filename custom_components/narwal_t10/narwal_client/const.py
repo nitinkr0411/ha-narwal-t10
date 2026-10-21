@@ -67,5 +67,10 @@ STRENGTH_TO_FAN = {v: k for k, v in STRENGTH_LEVELS.items()}
 KEEPALIVE_INTERVAL = 20.0
 RECONNECT_BACKOFF_MAX = 60.0
 STATUS_POLL_FALLBACK = 30.0  # seconds between polls while docked/idle
-ACTIVE_POLL = 4.0  # seconds between polls while the robot is working
+# While the robot is working, poll ~1/s like the official app. The robot
+# BROADCASTS /pita/map (live pose + path) to every connected session, but only
+# keeps streaming while a session polls /pita/info/all at the app's ~1 Hz
+# cadence; at 4 s the stream stalls (captured from the app over WireGuard:
+# the app sends nothing but /pita/info/all polls + commands, no map "subscribe").
+ACTIVE_POLL = 1.0  # seconds between polls while the robot is working
 REQUEST_TIMEOUT = 10.0
