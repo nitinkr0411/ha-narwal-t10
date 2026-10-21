@@ -19,6 +19,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .coordinator import NarwalCoordinator
 from .entity import NarwalEntity
 from .ha_const import DOMAIN
+from .narwal_client.errors import error_label
 from .narwal_client.models import RobotStatus
 
 
@@ -77,7 +78,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: NarwalCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(NarwalSensor(coordinator, d) for d in SENSORS)
+    entities: list[SensorEntity] = [NarwalSensor(coordinator, d) for d in SENSORS]
+    entities.append(NarwalErrorSensor(coordinator))
+    async_add_entities(entities)
 
 
 class NarwalSensor(NarwalEntity, SensorEntity):
@@ -93,3 +96,32 @@ class NarwalSensor(NarwalEntity, SensorEntity):
         if self.coordinator.data is None:
             return None
         return self.entity_description.value_fn(self.coordinator.data)
+
+
+class NarwalErrorSensor(NarwalEntity, SensorEntity):
+    """Human-readable fault text for the robot's ``error_code``.
+
+    State is the message the Narwal app shows (e.g. "Install dustbin"), "No
+    error" when clear, or "Error <code>" for any code not in the swept table.
+    The raw number is kept on the ``code`` attribute for templates/history.
+    """
+
+    _attr_name = "Error"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: NarwalCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.device_id}_error"
+
+    @property
+    def native_value(self):
+        if self.coordinator.data is None:
+            return None
+        return error_label(self.coordinator.data.error_code)
+
+    @property
+    def extra_state_attributes(self):
+        if self.coordinator.data is None:
+            return None
+        code = int(self.coordinator.data.error_code or 0)
+        return {"code": code, "is_error": bool(code)}
